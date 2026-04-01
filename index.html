@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>가설검정·신뢰구간 온라인 시험</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --card: #ffffff;
+      --ink: #1e2430;
+      --muted: #5a6475;
+      --line: #d9deea;
+      --accent: #335dff;
+      --ok: #15803d;
+      --bad: #b91c1c;
+      --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 6px 18px rgba(20, 30, 60, 0.06);
+    }
+    h1, h2, h3 { margin: 0 0 12px 0; }
+    h1 { font-size: 28px; }
+    h2 { font-size: 20px; }
+    .sub { color: var(--muted); margin-bottom: 8px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    label.meta {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="number"], input[type="url"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      font-size: 15px;
+    }
+    .question-title {
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .option {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+      align-items: flex-start;
+    }
+    .option input { margin-top: 5px; }
+    .btns {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button.secondary { background: #6b7280; }
+    button.light { background: #e8ecff; color: #22326d; }
+    .score {
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 6px;
+    }
+    .good { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .warn { color: var(--warn); }
+    .explain {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px dashed var(--line);
+      display: none;
+    }
+    .correct { border-left: 4px solid var(--ok); }
+    .incorrect { border-left: 4px solid var(--bad); }
+    .sticky {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(247,248,251,0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+      margin: -24px -24px 24px;
+      padding: 16px 24px;
+    }
+    .mini { font-size: 13px; color: var(--muted); }
+    .hidden { display: none; }
+    .pill {
+      display: inline-block;
+      background: #eef2ff;
+      color: #334155;
+      border: 1px solid #dbe4ff;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="sticky">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+        <div>
+          <h1>가설검정·신뢰구간 온라인 시험</h1>
+          <div class="mini">객관식 30문항 · 제출 즉시 채점 · Google Sheet 자동 저장 가능</div>
+        </div>
+        <div>
+          <span class="pill" id="saveStatus">자동 저장 대기</span>
+          <span class="pill" id="serverStatus">서버 미연결</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>응시자 정보</h2>
+      <div class="sub">이 정보와 점수가 함께 저장됩니다</div>
+      <div class="grid">
+        <div>
+          <label class="meta" for="studentName">이름</label>
+          <input id="studentName" type="text" placeholder="홍길동" />
+        </div>
+        <div>
+          <label class="meta" for="studentId">학번</label>
+          <input id="studentId" type="text" placeholder="20260001" />
+        </div>
+        <div>
+          <label class="meta" for="studentClass">분반</label>
+          <input id="studentClass" type="text" placeholder="A반" />
+        </div>
+      </div>
+    </div>
+
+    <form id="quizForm"></form>
+
+    <div class="card">
+      <h2>제출</h2>
+      <div class="mini">제출 후 점수와 정답 해설이 바로 보입니다</div>
+      <div class="btns">
+        <button type="button" id="submitBtn">제출 및 채점</button>
+        <button type="button" class="secondary" id="saveBtn">임시 저장</button>
+        <button type="button" class="light" id="resetBtn">전체 초기화</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="resultCard">
+      <h2>채점 결과</h2>
+      <div id="scoreText" class="score"></div>
+      <div id="resultMeta" class="sub"></div>
+      <div id="sendMeta" class="mini"></div>
+    </div>
+  </div>
+
+  <script>
+    const GAS_URL = "PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEBAPP_URL_HERE";
+    const QUIZ_KEY = "stats_quiz_v2";
+
+    const questions = [
+      {q:"모집단 평균을 추정할 때 가장 기본적으로 사용하는 표본 통계량은 무엇인가?", options:["표본평균","중앙값","최빈값","분산"], answer:0, exp:"모집단 평균 μ를 추정할 때 가장 대표적으로 쓰는 값은 표본평균 x̄입니다."},
+      {q:"모표준편차 σ를 알고 있을 때 표준오차는 무엇인가?", options:["σ","σ/√n","n/σ","√σ"], answer:1, exp:"표준오차는 표본평균의 표준편차로 σ/√n 입니다."},
+      {q:"표본크기 n이 커질수록 표준오차는 어떻게 되는가?", options:["증가한다","감소한다","변하지 않는다","표준편차와 같아진다"], answer:1, exp:"표준오차는 σ/√n 이므로 n이 커질수록 작아집니다."},
+      {q:"95% 신뢰구간에서 사용하는 대표적인 임계값 z는 무엇인가?", options:["1.64","1.96","2.33","2.58"], answer:1, exp:"양측 95% 신뢰구간의 표준정규 임계값은 약 1.96입니다."},
+      {q:"신뢰구간의 중심은 무엇인가?", options:["모평균 μ","표본평균 x̄","모표준편차 σ","표본크기 n"], answer:1, exp:"신뢰구간은 표본평균을 중심으로 위아래 오차만큼 퍼집니다."},
+      {q:"귀무가설 H₀의 역할로 가장 적절한 것은?", options:["새로운 주장","검정의 기준점","표본오차 설명","정답 자체"], answer:1, exp:"귀무가설은 검정의 기준이 되는 기본 주장입니다."},
+      {q:"대립가설 H₁의 의미로 가장 알맞은 것은?", options:["기존 주장을 유지함","귀무가설과 반대되는 주장","표준편차를 추정함","신뢰수준을 정함"], answer:1, exp:"대립가설은 귀무가설과 다른 방향의 주장입니다."},
+      {q:"유의수준 α = 0.05의 의미로 가장 적절한 것은?", options:["정확도가 95%라는 뜻","제1종 오류를 허용하는 최대 확률 5%","표본의 5%를 버린다는 뜻","모평균이 5% 변한다는 뜻"], answer:1, exp:"유의수준은 귀무가설이 참인데도 잘못 기각할 최대 허용 확률입니다."},
+      {q:"양측 Z검정에서 기각역 조건은 무엇인가?", options:["Z > zα/2","|Z| > zα/2","Z < zα/2","|Z| < zα/2"], answer:1, exp:"양측검정은 좌우 양쪽 꼬리를 모두 보므로 |Z| > 임계값 형태입니다."},
+      {q:"Z 검정통계량의 공식은 무엇인가?", options:["x̄/σ","(x̄−μ₀)/σ","(x̄−μ₀)/(σ/√n)","μ₀/x̄"], answer:2, exp:"모표준편차를 알고 있을 때 평균 검정의 Z값은 (x̄−μ₀)/(σ/√n) 입니다."},
+      {q:"표본평균 x̄가 귀무가설의 값 μ₀에서 멀어질수록 |Z|는 일반적으로 어떻게 되는가?", options:["작아진다","커진다","0이 된다","변화가 없다"], answer:1, exp:"분자가 커지므로 |Z|도 일반적으로 커집니다."},
+      {q:"다음 중 신뢰구간을 넓게 만드는 요인은 무엇인가?", options:["표본크기 증가","모표준편차 감소","더 큰 임계값 사용","표본평균 감소"], answer:2, exp:"오차한계는 임계값 × 표준오차이므로 임계값이 커지면 신뢰구간이 넓어집니다."},
+      {q:"95% 신뢰구간 안에 귀무가설 값 μ₀가 포함되면 결론은?", options:["귀무가설 기각","귀무가설 기각 불가","무조건 대립가설 채택","검정 불가능"], answer:1, exp:"양측검정에서 μ₀가 신뢰구간 안에 있으면 귀무가설을 기각하지 않습니다."},
+      {q:"95% 신뢰구간 밖에 μ₀가 있으면 결론은?", options:["귀무가설 유지","귀무가설 기각","모르겠다","표본을 다시 뽑아야 한다"], answer:1, exp:"신뢰구간 밖에 있으면 해당 값은 가능한 평균 범위에서 벗어나므로 기각합니다."},
+      {q:"표본크기가 증가하면 일반적으로 어떤 효과가 생기는가?", options:["추정의 정확도 증가","오차 증가","신뢰구간 무한대","검정 불가"], answer:0, exp:"표본크기가 커지면 표준오차가 줄어 추정이 더 정밀해집니다."},
+      {q:"모표준편차 σ가 커지면 신뢰구간은 어떻게 되는가?", options:["좁아진다","넓어진다","중심이 변한다","항상 같아진다"], answer:1, exp:"표준오차가 커져 오차한계가 커지므로 신뢰구간이 넓어집니다."},
+      {q:"가설검정의 주요 목적은 무엇인가?", options:["평균을 그냥 계산하는 것","주장의 타당성 판단","표본을 늘리는 것","그래프를 그리는 것"], answer:1, exp:"가설검정은 데이터로 특정 주장이나 기준값의 타당성을 판단하는 절차입니다."},
+      {q:"p-value에 대한 설명으로 가장 적절한 것은?", options:["모평균 자체","귀무가설이 참일 때 지금과 같거나 더 극단적인 결과가 나올 확률","표본평균의 확률","신뢰구간의 길이"], answer:1, exp:"p-value는 귀무가설 아래에서 관측 결과의 극단성을 수치화한 값입니다."},
+      {q:"일반적으로 p-value < 0.05이면 어떻게 판단하는가?", options:["귀무가설 기각","귀무가설 채택","판단 불가","무조건 표본이 잘못되었다"], answer:0, exp:"유의수준 0.05보다 작으면 통상 귀무가설을 기각합니다."},
+      {q:"95% 신뢰수준의 의미로 옳은 것은?", options:["이번 한 번의 구간이 95% 확률로 참이다","같은 방법을 반복하면 많은 구간 중 약 95%가 참값을 포함한다","모평균이 95이다","오차가 5%라는 뜻이다"], answer:1, exp:"신뢰수준은 반복추출 관점에서 해석합니다."},
+      {q:"표준편차가 크다는 말의 의미는?", options:["자료가 평균 근처에 모여 있다","자료의 흩어짐이 크다","평균이 작다","표본이 많다"], answer:1, exp:"표준편차는 자료의 산포 정도를 나타냅니다."},
+      {q:"단측검정의 특징은 무엇인가?", options:["방향이 없다","특정 방향의 차이만 본다","항상 양측보다 엄격하다","신뢰구간과 무관하다"], answer:1, exp:"단측검정은 크다 혹은 작다처럼 방향이 있는 대립가설을 사용합니다."},
+      {q:"|Z|가 임계값보다 많이 클수록 어떤 경향이 강한가?", options:["기각이 어려워진다","기각 근거가 강해진다","항상 p-value가 커진다","신뢰구간이 넓어진다"], answer:1, exp:"검정통계량이 임계값에서 멀어질수록 귀무가설과의 차이가 커집니다."},
+      {q:"표본오차를 직관적으로 설명하면 무엇에 가까운가?", options:["표본이 모집단과 달라서 생기는 차이","모표준편차 자체","표본크기의 역수","유의수준과 같은 값"], answer:0, exp:"표본을 뽑았기 때문에 생기는 추정값과 참값 사이의 차이를 표본오차로 이해할 수 있습니다."},
+      {q:"제1종 오류는 무엇인가?", options:["거짓인 귀무가설을 채택함","참인 귀무가설을 기각함","평균을 잘못 계산함","표본을 잘못 추출함"], answer:1, exp:"제1종 오류는 참인 귀무가설을 잘못 기각하는 오류입니다."},
+      {q:"제2종 오류는 무엇인가?", options:["거짓인 귀무가설을 기각하지 못함","참인 귀무가설을 기각함","표준오차를 잘못 계산함","표본을 버리는 오류"], answer:0, exp:"제2종 오류는 실제로 거짓인 귀무가설을 기각하지 못하는 경우입니다."},
+      {q:"검정력(power)은 무엇과 관련이 깊은가?", options:["제2종 오류를 피하는 힘","표준편차를 줄이는 힘","제1종 오류를 만드는 힘","표본평균을 키우는 힘"], answer:0, exp:"검정력은 거짓인 귀무가설을 올바르게 기각할 확률로 1-β 입니다."},
+      {q:"n = 25, σ = 10일 때 표준오차는 얼마인가?", options:["10","5","2","1"], answer:2, exp:"표준오차는 10/√25 = 10/5 = 2 입니다."},
+      {q:"양측검정에서 95% 신뢰구간과 5% 유의수준 가설검정의 관계는?", options:["대체로 비슷하지만 다를 수 있다","항상 같은 결론이 나온다","전혀 무관하다","표본이 작을 때만 같다"], answer:1, exp:"같은 가정과 같은 기준을 쓰면 양측검정과 대응 신뢰구간은 같은 결론을 줍니다."},
+      {q:"x̄ = 115, μ₀ = 120, σ = 10, n = 25일 때 Z값은 얼마인가?", options:["-1.0","-2.5","2.5","1.96"], answer:1, exp:"Z = (115-120)/(10/√25) = -5/2 = -2.5 이므로 기각역에 들어갑니다."}
+    ];
+
+    const form = document.getElementById('quizForm');
+    const resultCard = document.getElementById('resultCard');
+    const scoreText = document.getElementById('scoreText');
+    const resultMeta = document.getElementById('resultMeta');
+    const sendMeta = document.getElementById('sendMeta');
+    const saveStatus = document.getElementById('saveStatus');
+    const serverStatus = document.getElementById('serverStatus');
+
+    function renderQuiz() {
+      questions.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="question-title">문항 ${idx + 1}. ${item.q}</div>
+          <div>
+            ${item.options.map((opt, j) => `
+              <label class="option">
+                <input type="radio" name="q${idx}" value="${j}" />
+                <span>${String.fromCharCode(9312 + j)} ${opt}</span>
+              </label>
+            `).join('')}
+          </div>
+          <div class="explain" id="exp${idx}"></div>
+        `;
+        form.appendChild(card);
+      });
+    }
+
+    function getPayload() {
+      const answers = questions.map((_, idx) => {
+        const picked = document.querySelector(`input[name="q${idx}"]:checked`);
+        return picked ? Number(picked.value) : null;
+      });
+      return {
+        studentName: document.getElementById('studentName').value.trim(),
+        studentId: document.getElementById('studentId').value.trim(),
+        studentClass: document.getElementById('studentClass').value.trim(),
+        answers,
+        submittedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      };
+    }
+
+    function saveLocal(showMessage = true) {
+      localStorage.setItem(QUIZ_KEY, JSON.stringify(getPayload()));
+      saveStatus.textContent = '브라우저에 저장됨';
+      if (showMessage) alert('임시 저장되었습니다. 같은 브라우저에서 이어서 풀 수 있습니다.');
+    }
+
+    function loadLocal() {
+      const raw = localStorage.getItem(QUIZ_KEY);
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        document.getElementById('studentName').value = data.studentName || '';
+        document.getElementById('studentId').value = data.studentId || '';
+        document.getElementById('studentClass').value = data.studentClass || '';
+        (data.answers || []).forEach((v, idx) => {
+          if (v === null || v === undefined) return;
+          const input = document.querySelector(`input[name="q${idx}"][value="${v}"]`);
+          if (input) input.checked = true;
+        });
+        saveStatus.textContent = '이전 저장본 불러옴';
+      } catch (e) {
+        saveStatus.textContent = '저장본 읽기 실패';
+      }
+    }
+
+    function gradeQuiz() {
+      const payload = getPayload();
+      const missing = payload.answers.filter(v => v === null).length;
+      if (!payload.studentName || !payload.studentId || !payload.studentClass) {
+        alert('이름, 학번, 분반을 먼저 입력해 주세요.');
+        return null;
+      }
+      if (missing > 0) {
+        const go = confirm(`미응답 문항이 ${missing}개 있습니다. 그대로 제출할까요?`);
+        if (!go) return null;
+      }
+
+      let score = 0;
+      const details = questions.map((q, idx) => {
+        const isCorrect = payload.answers[idx] === q.answer;
+        if (isCorrect) score += 1;
+        return {
+          no: idx + 1,
+          picked: payload.answers[idx],
+          correct: q.answer,
+          isCorrect,
+          explanation: q.exp
+        };
+      });
+
+      details.forEach((d, idx) => {
+        const box = document.getElementById(`exp${idx}`);
+        const pickedLabel = d.picked === null ? '미응답' : `${String.fromCharCode(9312 + d.picked)} ${questions[idx].options[d.picked]}`;
+        const correctLabel = `${String.fromCharCode(9312 + d.correct)} ${questions[idx].options[d.correct]}`;
+        box.style.display = 'block';
+        box.className = `explain ${d.isCorrect ? 'correct' : 'incorrect'}`;
+        box.innerHTML = `
+          <div><strong>${d.isCorrect ? '정답' : '오답'}</strong></div>
+          <div>선택: ${pickedLabel}</div>
+          <div>정답: ${correctLabel}</div>
+          <div>해설: ${d.explanation}</div>
+        `;
+      });
+
+      const percent = Math.round((score / questions.length) * 100);
+      resultCard.classList.remove('hidden');
+      scoreText.textContent = `${score} / ${questions.length}점 (${percent}점)`;
+      scoreText.className = `score ${percent >= 80 ? 'good' : percent >= 60 ? 'warn' : 'bad'}`;
+      resultMeta.textContent = `${payload.studentName} · ${payload.studentId} · ${payload.studentClass}`;
+
+      return {
+        ...payload,
+        score,
+        percent,
+        total: questions.length,
+        details
+      };
+    }
+
+    async function sendToServer(result) {
+      if (!GAS_URL || GAS_URL.includes('PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEBAPP_URL_HERE')) {
+        serverStatus.textContent = '서버 미연결';
+        sendMeta.textContent = '현재는 자동 채점만 동작합니다. Google Apps Script URL을 넣으면 점수가 자동 저장됩니다.';
+        return;
+      }
+
+      try {
+        serverStatus.textContent = '서버 전송 중';
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(result)
+        });
+        const text = await res.text();
+        serverStatus.textContent = '서버 저장 완료';
+        sendMeta.textContent = `저장 결과: ${text}`;
+      } catch (err) {
+        console.error(err);
+        serverStatus.textContent = '서버 저장 실패';
+        sendMeta.textContent = '자동 채점은 완료되었지만 서버 저장은 실패했습니다. Apps Script 배포 상태와 URL을 확인해 주세요.';
+      }
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const result = gradeQuiz();
+      if (!result) return;
+      saveLocal(false);
+      await sendToServer(result);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => saveLocal(true));
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if (!confirm('입력한 답안과 저장본을 모두 지울까요?')) return;
+      localStorage.removeItem(QUIZ_KEY);
+      location.reload();
+    });
+
+    ['studentName','studentId','studentClass'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => {
+        localStorage.setItem(QUIZ_KEY, JSON.stringify(getPayload()));
+        saveStatus.textContent = '자동 저장됨';
+      });
+    });
+
+    document.addEventListener('change', e => {
+      if (e.target.matches('input[type="radio"]')) {
+        localStorage.setItem(QUIZ_KEY, JSON.stringify(getPayload()));
+        saveStatus.textContent = '자동 저장됨';
+      }
+    });
+
+    renderQuiz();
+    loadLocal();
+  </script>
+</body>
+</html>
